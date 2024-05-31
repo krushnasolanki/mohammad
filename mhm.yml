@@ -1,0 +1,46 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+
+exporters:
+  debug:
+    verbosity: detailed
+  kafka:
+    brokers: ["kafka-broker1:9092", "kafka-broker2:9092"]
+    topic: "observability-topic"
+    encoding: "proto"
+
+processors:
+  batch:
+    timeout: 10s
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, kafka]
+
+
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+# Set up the OpenTelemetry tracer
+trace.set_tracer_provider(TracerProvider())
+tracer = trace.get_tracer(_name_)
+
+# Set up the OTLP exporter to send data to the collector
+otlp_exporter = OTLPSpanExporter(endpoint="http://localhost:4317", insecure=True)
+span_processor = BatchSpanProcessor(otlp_exporter)
+trace.get_tracer_provider().add_span_processor(span_processor)
+
+# Generate telemetry data
+with tracer.start_as_current_span("example-span") as span:
+    span.set_attribute("example-attribute", "example-value")
+    span.add_event("example-event")
+
+print("Telemetry data sent")
